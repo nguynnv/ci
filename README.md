@@ -13,7 +13,7 @@ Bot Discord thu thập metadata hoạt động, tính điểm **Activity / Welco
 ## Cấu trúc
 - `src/bot.js` – thu event (message/join/leave), băm user id (HMAC theo từng server), lệnh `/ci`.
 - `src/scoring.js` – metric, chuẩn hóa, công thức `A`, `W`, `Overall`, confidence, trạng thái, anomaly. Trọng số nằm ở `WEIGHTS`, đổi công thức thì đổi `VERSION`.
-- `src/jobs.js` – chạy mỗi `JOB_INTERVAL_MIN` phút (trong tiến trình web): daily metrics, snapshot, percentile, xóa event hết hạn.
+- `src/jobs.js` – chạy mỗi `JOB_INTERVAL_MIN` phút (mặc định 15 phút, trong tiến trình web): daily metrics, snapshot, percentile, xóa event hết hạn.
 - `src/server.js` – OAuth2, API public/admin. `public/index.html` – giao diện unzi: index giới thiệu, dashboard server Discord, profile, biểu đồ hoạt động/radar, leaderboard và admin panel responsive.
 
 ## Quyết định thiết kế cần biết

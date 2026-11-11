@@ -53,7 +53,10 @@ const syncGuild = async (g) => {
   const ch = g.channels.cache.filter((c) => [CT.GuildText, CT.GuildAnnouncement, CT.GuildForum].includes(c.type)).map((c) => ({ id: c.id, name: c.name }));
   await q('UPDATE guilds SET channels=? WHERE id=?', [JSON.stringify(ch), g.id]);
 };
-client.on(Events.GuildCreate, async (g) => { await syncGuild(g); await loadCfg(); });
+client.on(Events.GuildCreate, async (g) => {
+  try { await syncGuild(g); await loadCfg(); }
+  catch (e) { console.error('[bot] initial guild sync', g.id, e); }
+});
 client.on(Events.GuildDelete, async (g) => {
   await purgeGuildData(g.id);
   await q('UPDATE guilds SET bot_present=0, enabled=0, paused=0, deleted_at=? WHERE id=?', [new Date(), g.id]);
@@ -94,7 +97,7 @@ client.once(Events.ClientReady, async () => {
   setInterval(loadCfg, 30e3);
   setInterval(flush, 5e3);
   setInterval(() => { const ids = [...client.guilds.cache.keys()]; if (ids.length) q('UPDATE guilds SET last_heartbeat=? WHERE id IN (?)', [new Date(), ids]); }, 60e3);
-  setInterval(() => client.guilds.cache.forEach((g) => syncGuild(g).catch(() => {})), 10 * 60e3);
+  setInterval(() => client.guilds.cache.forEach((g) => syncGuild(g).catch((e) => console.error('[bot] guild sync', g.id, e))), 60e3);
   console.log(`Bot sẵn sàng: ${client.user.tag}, ${client.guilds.cache.size} server`);
 });
 client.on('error', console.error);

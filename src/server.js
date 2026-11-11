@@ -123,9 +123,10 @@ app.get('/api/admin/guilds', A(async (req, res) => {
   const s = sess(req);
   if (!s) return res.status(401).json({ error: 'login' });
   const ids = s.guilds.map((g) => g.id);
-  const have = ids.length ? await q('SELECT id,bot_present FROM guilds WHERE id IN (?)', [ids]) : [];
+  const have = ids.length ? await q('SELECT id,bot_present,last_heartbeat FROM guilds WHERE id IN (?)', [ids]) : [];
   const m = new Map(have.map((r) => [r.id, r]));
   res.json({ user: { id: s.id, name: s.name }, guilds: s.guilds.map((g) => ({ ...g, ...(m.get(g.id) || { bot_present: 0 }),
+    bot_present: Boolean((m.get(g.id) || {}).bot_present), last_heartbeat: (m.get(g.id) || {}).last_heartbeat || null,
     invite: g.can_manage ? `https://discord.com/oauth2/authorize?client_id=${CID}&scope=bot%20applications.commands&permissions=1024&guild_id=${g.id}&disable_guild_select=true` : null })) });
 }));
 
@@ -156,7 +157,7 @@ app.get('/api/admin/overview', admin, A(async (req, res) => {
   const history = await q(`SELECT day, SUM(messages) messages, SUM(replies) replies,
       COUNT(DISTINCT guild_id) active_servers
     FROM daily_metrics WHERE day>=? GROUP BY day ORDER BY day`, [new Date(Date.now() - 30 * 864e5)]);
-  const [recent] = await q(`SELECT g.id,g.name,g.bot_present,g.enabled,g.paused,g.last_heartbeat,
+  const recent = await q(`SELECT g.id,g.name,g.bot_present,g.enabled,g.paused,g.last_heartbeat,
       s.overall,s.activity,s.welcoming,s.confidence,s.ranking_status status
     FROM guilds g LEFT JOIN score_snapshots s ON s.guild_id=g.id AND s.scoring_version=? AND s.snap_date=(
       SELECT MAX(snap_date) FROM score_snapshots WHERE guild_id=g.id AND scoring_version=?)
@@ -223,4 +224,4 @@ app.patch('/api/admin/guilds/:id/config', mine, A(async (req, res) => {
 
 app.listen(PORT, () => console.log(`Web: ${BASE_URL}`));
 setTimeout(runJobs, 10e3);
-setInterval(runJobs, (+process.env.JOB_INTERVAL_MIN || 60) * 6e4);
+setInterval(runJobs, (+process.env.JOB_INTERVAL_MIN || 15) * 6e4);
