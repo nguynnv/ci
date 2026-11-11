@@ -15,8 +15,14 @@ export const pseudo = (guildId, userId) =>
 export const audit = (guildId, actor, action, meta = null) =>
   q('INSERT INTO audit_logs (guild_id, actor_id, action, meta) VALUES (?,?,?,?)', [guildId, actor, action, meta && JSON.stringify(meta)]);
 
+export async function purgeGuildData(id) {
+  for (const t of ['events', 'daily_metrics', 'score_snapshots', 'score_adjustments']) {
+    await q(`DELETE FROM ${t} WHERE guild_id=?`, [id]);
+  }
+}
+
 export async function unlinkGuild(id, actor) {
-  for (const t of ['events', 'daily_metrics', 'score_snapshots']) await q(`DELETE FROM ${t} WHERE guild_id=?`, [id]);
+  await purgeGuildData(id);
   await q('UPDATE guilds SET enabled=0, paused=0, is_public=0, consented_at=NULL, deleted_at=? WHERE id=?', [new Date(), id]);
   await audit(id, actor, 'unlink');
 }

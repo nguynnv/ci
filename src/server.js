@@ -19,6 +19,11 @@ app.use((_, res, next) => {
   next();
 });
 app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
+const publicDir = fileURLToPath(new URL('../public', import.meta.url));
+app.get('/dashboard', (_, res) => res.sendFile(`${publicDir}\\dashboard.html`));
+app.get('/admin', (_, res) => res.sendFile(`${publicDir}\\admin.html`));
+app.get('/server', (_, res) => res.sendFile(`${publicDir}\\server.html`));
+app.get('/methodology', (_, res) => res.sendFile(`${publicDir}\\methodology.html`));
 
 // ---- Discord OAuth2 + session trong bộ nhớ (MVP; đổi sang bảng/Redis khi chạy nhiều tiến trình) ----
 const sessions = new Map();
@@ -74,7 +79,7 @@ app.get('/api/leaderboard', A(async (req, res) => {
   const rows = await q(`SELECT g.id,g.name,g.icon,g.categories,g.language, s.activity,s.welcoming,s.overall,s.confidence,s.percentile,s.ranking_status status,
       (SELECT COALESCE(o.overall,o.activity) FROM score_snapshots o WHERE o.guild_id=g.id AND o.scoring_version=? AND o.snap_date<=? ORDER BY o.snap_date DESC LIMIT 1) prev
     FROM guilds g JOIN score_snapshots s ON s.guild_id=g.id AND s.scoring_version=? AND s.snap_date=(SELECT MAX(snap_date) FROM score_snapshots WHERE guild_id=g.id AND scoring_version=?)
-    WHERE g.bot_present=1 AND g.deleted_at IS NULL AND s.ranking_status<>'collecting'${w.length ? ' AND ' + w.join(' AND ') : ''}
+    WHERE g.bot_present=1 AND g.is_public=1 AND g.deleted_at IS NULL AND s.ranking_status<>'collecting'${w.length ? ' AND ' + w.join(' AND ') : ''}
     ORDER BY (s.ranking_status='ranked') DESC, COALESCE(s.overall,s.activity) DESC LIMIT 500`, [VERSION, ago, VERSION, VERSION, ...p]);
   res.json(rows.map(({ prev, ...r }) => ({ ...r, trend: prev == null ? null : Math.round((Number(r.overall ?? r.activity) - Number(prev)) * 10) / 10 })));
 }));
@@ -82,7 +87,7 @@ app.get('/api/leaderboard', A(async (req, res) => {
 app.get('/api/guilds/:id', A(async (req, res) => {
   const flags = await settings();
   if (!flags.public_profiles) return res.status(404).json({ error: 'feature_disabled' });
-  const [g] = await q('SELECT id,name,icon,description,categories,language,invite_url FROM guilds WHERE id=? AND bot_present=1 AND deleted_at IS NULL', [req.params.id]);
+  const [g] = await q('SELECT id,name,icon,description,categories,language,invite_url FROM guilds WHERE id=? AND bot_present=1 AND is_public=1 AND deleted_at IS NULL', [req.params.id]);
   if (!g) return res.status(404).json({ error: 'not_found' });
   const s = await latest(g.id), b = s?.breakdown, ok = b?.raw?.mam >= 10; // suppression: mẫu nhỏ thì không công khai biểu đồ
   const history = (await q('SELECT snap_date d, activity, welcoming, overall FROM score_snapshots WHERE guild_id=? AND scoring_version=? ORDER BY snap_date DESC LIMIT 90', [g.id, VERSION])).reverse();
@@ -95,10 +100,16 @@ app.get('/api/guilds/:id', A(async (req, res) => {
 }));
 
 // ---- Admin API (chỉ người có Manage Server ở server đó) ----
-const mine = (req, res, next) => {
+const member = (req, res, next) => {
   const s = sess(req);
   if (!s) return res.status(401).json({ error: 'login' });
   if (!s.guilds.some((g) => g.id === req.params.id)) return res.status(403).json({ error: 'forbidden' });
+  req.s = s; next();
+};
+const mine = (req, res, next) => {
+  const s = sess(req);
+  if (!s) return res.status(401).json({ error: 'login' });
+  if (!s.guilds.some((g) => g.id === req.params.id && g.can_manage)) return res.status(403).json({ error: 'manage_server_required' });
   req.s = s; next();
 };
 const admin = (req, res, next) => {
@@ -118,7 +129,7 @@ app.get('/api/admin/guilds', A(async (req, res) => {
     invite: g.can_manage ? `https://discord.com/oauth2/authorize?client_id=${CID}&scope=bot%20applications.commands&permissions=1024&guild_id=${g.id}&disable_guild_select=true` : null })) });
 }));
 
-app.get('/api/my/guilds/:id', mine, A(async (req, res) => {
+app.get('/api/my/guilds/:id', member, A(async (req, res) => {
   const [g] = await q('SELECT id,name,icon,description,categories,language,invite_url,bot_present FROM guilds WHERE id=?', [req.params.id]);
   const base = req.s.guilds.find((x) => x.id === req.params.id);
   if (!base) return res.status(403).json({ error: 'forbidden' });

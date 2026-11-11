@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits as I, ChannelType as CT, Events, MessageType, PermissionFlagsBits as P, SlashCommandBuilder } from 'discord.js';
-import { q, pseudo } from './db.js';
+import { q, pseudo, purgeGuildData } from './db.js';
 
 const TTL = (+process.env.EVENT_TTL_DAYS || 35) * 864e5;
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
@@ -54,7 +54,11 @@ const syncGuild = async (g) => {
   await q('UPDATE guilds SET channels=? WHERE id=?', [JSON.stringify(ch), g.id]);
 };
 client.on(Events.GuildCreate, async (g) => { await syncGuild(g); await loadCfg(); });
-client.on(Events.GuildDelete, async (g) => { await q('UPDATE guilds SET bot_present=0, enabled=0, paused=0 WHERE id=?', [g.id]); await loadCfg(); });
+client.on(Events.GuildDelete, async (g) => {
+  await purgeGuildData(g.id);
+  await q('UPDATE guilds SET bot_present=0, enabled=0, paused=0, deleted_at=? WHERE id=?', [new Date(), g.id]);
+  await loadCfg();
+});
 
 // ---- lệnh /ci ----
 const cmd = new SlashCommandBuilder().setName('ci').setDescription('unzi ranking').setDMPermission(false);

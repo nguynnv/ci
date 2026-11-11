@@ -28,6 +28,10 @@ export async function runJobs() {
     }
     await percentiles(today);
     await q('DELETE FROM events WHERE expires_at < ?', [now]);
+    await q('DELETE FROM daily_metrics WHERE day < ?', [new Date(Date.now() - 180 * 864e5)]);
+    await q('DELETE FROM score_snapshots WHERE snap_date < ?', [new Date(Date.now() - 365 * 864e5)]);
+    await q('DELETE FROM score_adjustments WHERE created_at < ?', [new Date(Date.now() - 365 * 864e5)]);
+    await q('DELETE FROM audit_logs WHERE created_at < ?', [new Date(Date.now() - 365 * 864e5)]);
   } catch (e) { console.error('[jobs]', e); } finally { busy = false; }
 }
 
