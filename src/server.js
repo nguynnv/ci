@@ -49,6 +49,10 @@ app.get('/auth/callback', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).send('Lỗi đăng nhập'); }
 });
 app.get('/auth/logout', (req, res) => { sessions.delete(cookie(req, 'sid')); setCk(res, 'sid', '', 0); res.redirect('/'); });
+app.get('/api/session', (req, res) => {
+  const s = sess(req);
+  res.json(s ? { authenticated: true, user: { id: s.id, name: s.name } } : { authenticated: false });
+});
 
 // ---- Public API ----
 const latest = async (id) => (await q('SELECT * FROM score_snapshots WHERE guild_id=? AND scoring_version=? ORDER BY snap_date DESC LIMIT 1', [id, VERSION]))[0];
