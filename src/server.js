@@ -7,6 +7,7 @@ import { runJobs } from './jobs.js';
 import { VERSION, WEIGHTS } from './scoring.js';
 
 const { DISCORD_CLIENT_ID: CID, DISCORD_CLIENT_SECRET: SECRET, BASE_URL = 'http://localhost:3000', PORT = 3000 } = process.env;
+const ADMIN_IDS = new Set((process.env.ADMIN_DISCORD_IDS || '').split(',').map((id) => id.trim()).filter(Boolean));
 const CATS = ['gaming', 'education', 'technology', 'creator', 'social', 'support', 'fan', 'marketplace', 'other'];
 const A = (f) => (req, res) => f(req, res).catch((e) => { console.error(e); res.status(500).json({ error: 'server' }); });
 
@@ -23,6 +24,7 @@ app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
 const sessions = new Map();
 const cookie = (req, k) => (req.headers.cookie || '').split(';').map((s) => s.trim().split('=')).find(([n]) => n === k)?.[1];
 const sess = (req) => { const s = sessions.get(cookie(req, 'sid')); return s && s.exp > Date.now() ? s : null; };
+const settings = async () => Object.fromEntries((await q('SELECT setting_key, setting_value FROM system_settings')).map((r) => [r.setting_key, !!r.setting_value]));
 const setCk = (res, k, v, age) => res.append('Set-Cookie', `${k}=${v}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${BASE_URL.startsWith('https') ? '; Secure' : ''}`);
 const REDIRECT = `${BASE_URL}/auth/callback`;
 
@@ -52,10 +54,15 @@ app.get('/auth/logout', (req, res) => { sessions.delete(cookie(req, 'sid')); set
 const latest = async (id) => (await q('SELECT * FROM score_snapshots WHERE guild_id=? AND scoring_version=? ORDER BY snap_date DESC LIMIT 1', [id, VERSION]))[0];
 const daily = async (id, n) => (await q('SELECT day, unique_active, messages FROM daily_metrics WHERE guild_id=? ORDER BY day DESC LIMIT ?', [id, n])).reverse();
 
-app.get('/api/methodology', (_, res) => res.json({ version: VERSION, weights: WEIGHTS, window: '30 ngày', categories: CATS,
-  notes: ['Không dùng tổng số thành viên, boost hay quảng cáo để tính điểm.', 'Thiếu dữ liệu hiển thị "chưa đủ dữ liệu", không bị tính 0.', 'Độ tin cậy dữ liệu là chỉ số riêng, không phải chất lượng cộng đồng.', 'Ranked cần ≥60 ngày quan sát, đủ mẫu, độ tin cậy ≥60 và không có cờ bất thường.'] }));
+app.get('/api/methodology', A(async (_, res) => {
+  if (!(await settings()).public_methodology) return res.status(404).json({ error: 'feature_disabled' });
+  res.json({ version: VERSION, weights: WEIGHTS, window: '30 ngày', categories: CATS,
+  notes: ['Không dùng tổng số thành viên, boost hay quảng cáo để tính điểm.', 'Thiếu dữ liệu hiển thị "chưa đủ dữ liệu", không bị tính 0.', 'Độ tin cậy dữ liệu là chỉ số riêng, không phải chất lượng cộng đồng.', 'Ranked cần ≥60 ngày quan sát, đủ mẫu, độ tin cậy ≥60 và không có cờ bất thường.'] });
+}));
 
 app.get('/api/leaderboard', A(async (req, res) => {
+  const flags = await settings();
+  if (!flags.public_leaderboard) return res.status(404).json({ error: 'feature_disabled' });
   const { category, language } = req.query, w = [], p = [];
   if (CATS.includes(category)) { w.push('JSON_CONTAINS(g.categories, JSON_QUOTE(?))'); p.push(category); }
   if (/^[a-z]{2,8}$/.test(language || '')) { w.push('g.language=?'); p.push(language); }
@@ -69,6 +76,8 @@ app.get('/api/leaderboard', A(async (req, res) => {
 }));
 
 app.get('/api/guilds/:id', A(async (req, res) => {
+  const flags = await settings();
+  if (!flags.public_profiles) return res.status(404).json({ error: 'feature_disabled' });
   const [g] = await q('SELECT id,name,icon,description,categories,language,invite_url FROM guilds WHERE id=? AND enabled=1 AND is_public=1 AND deleted_at IS NULL', [req.params.id]);
   if (!g) return res.status(404).json({ error: 'not_found' });
   const s = await latest(g.id), b = s?.breakdown, ok = b?.raw?.mam >= 10; // suppression: mẫu nhỏ thì không công khai biểu đồ
@@ -88,6 +97,12 @@ const mine = (req, res, next) => {
   if (!s.guilds.some((g) => g.id === req.params.id)) return res.status(403).json({ error: 'forbidden' });
   req.s = s; next();
 };
+const admin = (req, res, next) => {
+  const s = sess(req);
+  if (!s) return res.status(401).json({ error: 'login' });
+  if (!ADMIN_IDS.has(s.id)) return res.status(403).json({ error: 'admin_only' });
+  req.s = s; next();
+};
 
 app.get('/api/admin/guilds', A(async (req, res) => {
   const s = sess(req);
@@ -97,6 +112,39 @@ app.get('/api/admin/guilds', A(async (req, res) => {
   const m = new Map(have.map((r) => [r.id, r]));
   res.json({ user: { id: s.id, name: s.name }, guilds: s.guilds.map((g) => ({ ...g, ...(m.get(g.id) || { bot_present: 0 }),
     invite: `https://discord.com/oauth2/authorize?client_id=${CID}&scope=bot%20applications.commands&permissions=1024&guild_id=${g.id}&disable_guild_select=true` })) }); // 1024 = View Channel, không cần Administrator
+}));
+
+app.get('/api/admin/overview', admin, A(async (req, res) => {
+  const [counts] = await q(`SELECT
+    COUNT(*) total,
+    SUM(bot_present=1) connected,
+    SUM(enabled=1 AND bot_present=1) tracking,
+    SUM(paused=1 AND bot_present=1) paused,
+    SUM(is_public=1 AND enabled=1 AND bot_present=1) public_count
+    FROM guilds WHERE deleted_at IS NULL`);
+  const [events] = await q('SELECT COUNT(*) total FROM events WHERE ts>=?', [new Date(Date.now() - 864e5)]);
+  const history = await q(`SELECT day, SUM(messages) messages, SUM(replies) replies,
+      COUNT(DISTINCT guild_id) active_servers
+    FROM daily_metrics WHERE day>=? GROUP BY day ORDER BY day`, [new Date(Date.now() - 30 * 864e5)]);
+  const [recent] = await q(`SELECT g.id,g.name,g.bot_present,g.enabled,g.paused,g.last_heartbeat,
+      s.overall,s.activity,s.welcoming,s.confidence,s.ranking_status status
+    FROM guilds g LEFT JOIN score_snapshots s ON s.guild_id=g.id AND s.scoring_version=? AND s.snap_date=(
+      SELECT MAX(snap_date) FROM score_snapshots WHERE guild_id=g.id AND scoring_version=?)
+    WHERE g.deleted_at IS NULL ORDER BY g.last_heartbeat DESC LIMIT 100`, [VERSION, VERSION]);
+  const auditRows = await q('SELECT id,guild_id,actor_id,action,created_at FROM audit_logs ORDER BY id DESC LIMIT 30');
+  res.json({ user: { id: req.s.id, name: req.s.name }, counts: { ...counts, events24h: events.total },
+    history, settings: await settings(), guilds: recent, audit: auditRows });
+}));
+
+app.patch('/api/admin/settings', admin, A(async (req, res) => {
+  const allowed = ['public_leaderboard', 'public_profiles', 'public_methodology'];
+  const updates = Object.entries(req.body || {}).filter(([key, value]) => allowed.includes(key) && typeof value === 'boolean');
+  if (!updates.length) return res.status(400).json({ error: 'empty' });
+  for (const [key, value] of updates) {
+    await q('INSERT INTO system_settings (setting_key, setting_value, updated_by) VALUES (?,?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value), updated_by=VALUES(updated_by)', [key, value ? 1 : 0, req.s.id]);
+  }
+  await audit(null, req.s.id, 'system_settings', updates.map(([key]) => key));
+  res.json({ settings: await settings() });
 }));
 
 app.get('/api/admin/guilds/:id', mine, A(async (req, res) => {

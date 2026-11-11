@@ -72,3 +72,15 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   meta JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  setting_key VARCHAR(64) PRIMARY KEY,
+  setting_value TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by VARCHAR(20) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
+  ('public_leaderboard', 1),
+  ('public_profiles', 1),
+  ('public_methodology', 1);
