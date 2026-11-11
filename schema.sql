@@ -84,3 +84,13 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
   ('public_leaderboard', 1),
   ('public_profiles', 1),
   ('public_methodology', 1);
+
+CREATE TABLE IF NOT EXISTS score_adjustments (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  guild_id VARCHAR(20) NOT NULL,
+  points DECIMAL(5,1) NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  actor_id VARCHAR(20) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY ix_adjustment_guild (guild_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

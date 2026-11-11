@@ -1,4 +1,4 @@
-# Community Intelligence (Node.js + MySQL)
+# unzi (Node.js + MySQL)
 
 Bot Discord thu thập metadata hoạt động, tính điểm **Activity / Welcoming / Overall / Data Confidence**, web dashboard hiển thị leaderboard, hồ sơ công khai và dashboard cho admin. Bám theo `idea.md` (Phase 1 + phần cốt lõi Phase 2).
 
@@ -7,14 +7,14 @@ Bot Discord thu thập metadata hoạt động, tính điểm **Activity / Welco
 2. Discord Developer Portal: tạo application, bật **Server Members Intent** (privileged). Không cần Message Content Intent. Thêm redirect OAuth2: `BASE_URL/auth/callback`.
 3. `npm install && npm run db:init`
 4. Chạy hai tiến trình: `npm run bot` và `npm run web`.
-5. Mở `BASE_URL`, đăng nhập, mời bot (quyền View Channel, không cần Administrator), vào `#/dashboard/<id>` chọn kênh, tick đồng ý, lưu.
+5. Mở `BASE_URL`, đăng nhập, mời bot (quyền View Channel, không cần Administrator). Bot tự động tham gia xếp hạng ngay khi được thêm; rời xếp hạng khi bị kick khỏi server.
 6. (Tuỳ chọn) Điền `ADMIN_DISCORD_IDS` bằng các Discord user ID được phép mở `#/admin`. Admin có thể ẩn toàn bộ bảng xếp hạng, profile công khai hoặc trang phương pháp bằng feature flags.
 
 ## Cấu trúc
 - `src/bot.js` – thu event (message/join/leave), băm user id (HMAC theo từng server), lệnh `/ci`.
 - `src/scoring.js` – metric, chuẩn hóa, công thức `A`, `W`, `Overall`, confidence, trạng thái, anomaly. Trọng số nằm ở `WEIGHTS`, đổi công thức thì đổi `VERSION`.
 - `src/jobs.js` – chạy mỗi `JOB_INTERVAL_MIN` phút (trong tiến trình web): daily metrics, snapshot, percentile, xóa event hết hạn.
-- `src/server.js` – OAuth2, API public/admin. `public/index.html` – giao diện Pulse: dashboard cá nhân, profile server, biểu đồ hoạt động/radar, leaderboard và admin panel responsive.
+- `src/server.js` – OAuth2, API public/admin. `public/index.html` – giao diện unzi: index giới thiệu, dashboard server Discord, profile, biểu đồ hoạt động/radar, leaderboard và admin panel responsive.
 
 ## Quyết định thiết kế cần biết
 - Ngưỡng chuẩn hóa (hàm `lin`/`logs` trong `scoring.js`) là **giá trị khởi điểm, chưa hiệu chỉnh**: cần chạy thử trên server thật rồi chỉnh.

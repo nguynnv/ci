@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits as I, ChannelType as CT, Events, MessageType, PermissionFlagsBits as P, SlashCommandBuilder } from 'discord.js';
-import { q, pseudo, audit, unlinkGuild } from './db.js';
+import { q, pseudo } from './db.js';
 
 const TTL = (+process.env.EVENT_TTL_DAYS || 35) * 864e5;
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
@@ -8,8 +8,8 @@ const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const client = new Client({ intents: [I.Guilds, I.GuildMembers, I.GuildMessages] });
 
 let cfg = new Map();
-const loadCfg = async () => { cfg = new Map((await q('SELECT id, enabled, paused, selected_channels sel FROM guilds WHERE bot_present=1')).map((r) => [r.id, r])); };
-const on = (id) => { const c = cfg.get(id); return c?.enabled && !c.paused ? c : null; };
+const loadCfg = async () => { cfg = new Map((await q('SELECT id, selected_channels sel FROM guilds WHERE bot_present=1')).map((r) => [r.id, r])); };
+const on = (id) => cfg.get(id) || null;
 
 // ---- buffer → INSERT IGNORE theo event_id (idempotent khi retry/reconnect) ----
 let buf = [];
@@ -46,17 +46,20 @@ client.on(Events.GuildMemberRemove, (mem) => {
 
 // ---- đồng bộ server / kênh (kênh dùng cho lựa chọn phạm vi đo trên dashboard) ----
 const syncGuild = async (g) => {
-  await q('INSERT INTO guilds (id,name,icon,bot_present) VALUES (?,?,?,1) ON DUPLICATE KEY UPDATE name=VALUES(name), icon=VALUES(icon), bot_present=1', [g.id, g.name, g.icon]);
+  await q(`INSERT INTO guilds (id,name,icon,bot_present,enabled,consented_at,deleted_at)
+    VALUES (?,?,?,1,1,NOW(),NULL)
+    ON DUPLICATE KEY UPDATE name=VALUES(name), icon=VALUES(icon), bot_present=1,
+      enabled=1, paused=0, consented_at=COALESCE(consented_at,NOW()), deleted_at=NULL`, [g.id, g.name, g.icon]);
   const ch = g.channels.cache.filter((c) => [CT.GuildText, CT.GuildAnnouncement, CT.GuildForum].includes(c.type)).map((c) => ({ id: c.id, name: c.name }));
   await q('UPDATE guilds SET channels=? WHERE id=?', [JSON.stringify(ch), g.id]);
 };
 client.on(Events.GuildCreate, async (g) => { await syncGuild(g); await loadCfg(); });
-client.on(Events.GuildDelete, async (g) => { await q('UPDATE guilds SET bot_present=0 WHERE id=?', [g.id]); await loadCfg(); });
+client.on(Events.GuildDelete, async (g) => { await q('UPDATE guilds SET bot_present=0, enabled=0, paused=0 WHERE id=?', [g.id]); await loadCfg(); });
 
 // ---- lệnh /ci ----
-const cmd = new SlashCommandBuilder().setName('ci').setDescription('Community Intelligence').setDMPermission(false);
-for (const [n, d] of [['setup', 'Mở dashboard để cấu hình'], ['status', 'Tình trạng bot và dữ liệu'], ['report', 'Điểm gần nhất'],
-  ['privacy', 'Dữ liệu được thu thập'], ['pause', 'Tạm dừng thu thập'], ['resume', 'Tiếp tục thu thập'], ['unlink', 'Ngừng theo dõi và xóa dữ liệu']]) cmd.addSubcommand((s) => s.setName(n).setDescription(d));
+const cmd = new SlashCommandBuilder().setName('ci').setDescription('unzi ranking').setDMPermission(false);
+for (const [n, d] of [['setup', 'Mở dashboard'], ['status', 'Tình trạng bot và dữ liệu'], ['report', 'Điểm gần nhất'],
+  ['privacy', 'Dữ liệu được thu thập']]) cmd.addSubcommand((s) => s.setName(n).setDescription(d));
 
 const f = (v) => (v == null ? 'chưa đủ dữ liệu' : Number(v).toFixed(1));
 client.on(Events.InteractionCreate, async (i) => {
@@ -68,20 +71,15 @@ client.on(Events.InteractionCreate, async (i) => {
     if (sub === 'setup') return say(`Cấu hình tại: ${BASE}/#/dashboard/${gid}`);
     if (sub === 'privacy') return say('**Thu thập:** thời điểm, kênh, mã băm một chiều của tác giả và người được trả lời/nhắc tới, loại tin (thường/reply), sự kiện vào/rời server.\n**Không thu thập:** nội dung tin nhắn, file, DM, hoạt động ở server khác. Bot không đọc nội dung (không dùng Message Content intent). Event tự xóa sau ' + TTL / 864e5 + ' ngày; chỉ giữ số liệu tổng hợp.');
     if (sub === 'status') {
-      const [g] = await q('SELECT enabled, paused, last_heartbeat FROM guilds WHERE id=?', [gid]);
+      const [g] = await q('SELECT bot_present, last_heartbeat FROM guilds WHERE id=?', [gid]);
       const [{ n }] = await q('SELECT COUNT(*) n FROM events WHERE guild_id=? AND ts>=?', [gid, new Date(Date.now() - 864e5)]);
-      return say(`Thu thập: **${g?.enabled ? (g.paused ? 'đang tạm dừng' : 'đang bật') : 'chưa bật (chạy /ci setup)'}**\nSự kiện 24 giờ qua: **${n}**\nBot báo cáo lần cuối: ${g?.last_heartbeat ? `<t:${Math.floor(+new Date(g.last_heartbeat) / 1000)}:R>` : 'chưa có'}`);
+      return say(`Xếp hạng: **${g?.bot_present ? 'đã tham gia' : 'chưa tham gia'}**\nSự kiện 24 giờ qua: **${n}**\nBot báo cáo lần cuối: ${g?.last_heartbeat ? `<t:${Math.floor(+new Date(g.last_heartbeat) / 1000)}:R>` : 'chưa có'}`);
     }
     if (sub === 'report') {
       const [s] = await q('SELECT * FROM score_snapshots WHERE guild_id=? ORDER BY snap_date DESC LIMIT 1', [gid]);
       if (!s) return say('Chưa có điểm. Server cần bật thu thập và đợi lần tính đầu tiên.');
       return say(`**Hoạt động:** ${f(s.activity)}\n**Đón người mới:** ${f(s.welcoming)}\n**Tổng hợp:** ${f(s.overall)}\n**Độ tin cậy dữ liệu:** ${f(s.confidence)}\n**Percentile:** ${s.percentile ?? 'chưa xếp'}\n**Trạng thái:** ${s.ranking_status}\nChi tiết: ${BASE}/#/g/${gid}`);
     }
-    if (sub === 'pause' || sub === 'resume') {
-      await q('UPDATE guilds SET paused=? WHERE id=?', [sub === 'pause' ? 1 : 0, gid]); await audit(gid, i.user.id, sub); await loadCfg();
-      return say(sub === 'pause' ? 'Đã tạm dừng thu thập.' : 'Đã tiếp tục thu thập.');
-    }
-    if (sub === 'unlink') { await unlinkGuild(gid, i.user.id); await loadCfg(); return say('Đã ngừng theo dõi và xóa dữ liệu của server này.'); }
   } catch (e) { console.error(e); say('Có lỗi xảy ra, thử lại sau.').catch(() => {}); }
 });
 
