@@ -66,7 +66,11 @@ const onJoin = async (g) => {
 };
 let isReady = false;
 client.on(Events.GuildCreate, (g) => { if (isReady) onJoin(g).catch(console.error); });
-client.on(Events.GuildDelete, async (g) => { await q('UPDATE guilds SET bot_present=0 WHERE id=?', [g.id]); await loadCfg(); });
+client.on(Events.GuildDelete, async (g) => {
+  if (g.unavailable) return;
+  await q('UPDATE guilds SET bot_present=0 WHERE id=?', [g.id]);
+  await loadCfg();
+});
 
 // ---- lệnh /ci ----
 const cmd = new SlashCommandBuilder().setName('ci').setDescription('Community Intelligence').setDMPermission(false);
@@ -103,7 +107,10 @@ client.once(Events.ClientReady, async () => {
   isReady = true;
   setInterval(loadCfg, 30e3);
   setInterval(flush, 5e3);
-  setInterval(() => { const ids = [...client.guilds.cache.keys()]; if (ids.length) q('UPDATE guilds SET last_heartbeat=? WHERE id IN (?)', [new Date(), ids]); }, 60e3);
+  setInterval(() => {
+    const ids = [...client.guilds.cache.keys()];
+    if (ids.length) q('UPDATE guilds SET bot_present=1, last_heartbeat=? WHERE id IN (?)', [new Date(), ids]);
+  }, 60e3);
   setInterval(() => client.guilds.cache.forEach((g) => syncGuild(g).catch(() => {})), 10 * 60e3);
   console.log(`Bot sẵn sàng: ${client.user.tag}, ${client.guilds.cache.size} server`);
 });
