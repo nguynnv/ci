@@ -15,14 +15,18 @@ export const pseudo = (guildId, userId) =>
 export const audit = (guildId, actor, action, meta = null) =>
   q('INSERT INTO audit_logs (guild_id, actor_id, action, meta) VALUES (?,?,?,?)', [guildId, actor, action, meta && JSON.stringify(meta)]);
 
-export async function purgeGuildData(id) {
-  for (const t of ['events', 'daily_metrics', 'score_snapshots', 'score_adjustments']) {
-    await q(`DELETE FROM ${t} WHERE guild_id=?`, [id]);
-  }
-}
-
 export async function unlinkGuild(id, actor) {
-  await purgeGuildData(id);
+  for (const t of ['events', 'daily_metrics', 'score_snapshots']) await q(`DELETE FROM ${t} WHERE guild_id=?`, [id]);
   await q('UPDATE guilds SET enabled=0, paused=0, is_public=0, consented_at=NULL, deleted_at=? WHERE id=?', [new Date(), id]);
   await audit(id, actor, 'unlink');
 }
+
+// ---- Công tắc tính năng (admin bật/tắt). "off" = ẩn hẳn: không menu, API trả 404 ----
+export const SETTING_VALUES = {
+  leaderboard: ['off', 'managers', 'public'],
+  public_profiles: ['off', 'managers', 'public'],
+  show_percentile: ['off', 'on'],
+};
+const DEF = { leaderboard: 'public', public_profiles: 'public', show_percentile: 'on' };
+export const getSettings = async () => ({ ...DEF, ...Object.fromEntries((await q('SELECT k, v FROM settings')).map((r) => [r.k, r.v])) });
+export const setSetting = (k, v) => q('INSERT INTO settings (k,v) VALUES (?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)', [k, v]);

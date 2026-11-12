@@ -3,20 +3,25 @@ CREATE TABLE IF NOT EXISTS guilds (
   name VARCHAR(100) NOT NULL,
   icon VARCHAR(64) NULL,
   description VARCHAR(500) NULL,
-  categories JSON NULL,
-  language VARCHAR(8) NOT NULL DEFAULT 'vi',
   invite_url VARCHAR(200) NULL,
   channels JSON NULL,
   selected_channels JSON NULL,
   is_public TINYINT(1) NOT NULL DEFAULT 1,
   enabled TINYINT(1) NOT NULL DEFAULT 0,
   paused TINYINT(1) NOT NULL DEFAULT 0,
+  hidden TINYINT(1) NOT NULL DEFAULT 0,
+  blocked TINYINT(1) NOT NULL DEFAULT 0,
+  admin_note VARCHAR(500) NULL,
   bot_present TINYINT(1) NOT NULL DEFAULT 1,
   consented_at DATETIME NULL,
   last_heartbeat DATETIME NULL,
   deleted_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE guilds ADD COLUMN hidden TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE guilds ADD COLUMN blocked TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE guilds ADD COLUMN admin_note VARCHAR(500) NULL;
 
 CREATE TABLE IF NOT EXISTS events (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -73,23 +78,29 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS system_settings (
-  setting_key VARCHAR(64) PRIMARY KEY,
-  setting_value TINYINT(1) NOT NULL DEFAULT 1,
-  updated_by VARCHAR(20) NULL,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS settings (
+  k VARCHAR(40) PRIMARY KEY,
+  v VARCHAR(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES
-  ('public_leaderboard', 1),
-  ('public_profiles', 1),
-  ('public_methodology', 1);
+CREATE TABLE IF NOT EXISTS appeals (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  guild_id VARCHAR(20) NOT NULL,
+  user_id VARCHAR(20) NOT NULL,
+  snapshot_id BIGINT NULL,
+  message VARCHAR(1000) NOT NULL,
+  status ENUM('open','resolved','rejected') NOT NULL DEFAULT 'open',
+  admin_reply VARCHAR(1000) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resolved_at DATETIME NULL,
+  KEY ix_status (status, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS score_adjustments (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   guild_id VARCHAR(20) NOT NULL,
-  points DECIMAL(5,1) NOT NULL,
-  reason VARCHAR(255) NOT NULL,
+  delta DECIMAL(5,1) NOT NULL,
+  reason VARCHAR(500) NOT NULL,
   actor_id VARCHAR(20) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY ix_adjustment_guild (guild_id, created_at)

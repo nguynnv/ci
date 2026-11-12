@@ -79,8 +79,7 @@ export async function computeGuild(g, now = new Date()) {
   for (const c of edges.values()) H -= (c / tot) * Math.log(c / tot);
 
   // ---- 2. Community Activity (A) ----
-  // Cho phép profile có điểm provisional trong 24 giờ đầu; điểm ổn định dần khi mẫu lớn hơn.
-  const enough = tracked >= 1 && mam >= 3 && M >= 20;
+  const enough = mam >= 10 && M >= 100;
   const hist = dl.slice(-tracked), act = {};
   if (enough) {
     act.U = 0.5 * logs(mam, 5, 300) + 0.5 * lin(memberDays / mam, 1, 6); // log-scaled, không thưởng tổng member
@@ -120,7 +119,7 @@ export async function computeGuild(g, now = new Date()) {
     V: coverage * 100,
   };
   const W = nC >= 10 ? combine(WEIGHTS.welcoming, wel) : null;
-  const O = A == null ? null : W == null ? A : WEIGHTS.overall.activity * A + WEIGHTS.overall.welcoming * W;
+  const O = A != null && W != null ? WEIGHTS.overall.activity * A + WEIGHTS.overall.welcoming * W : null;
 
   // ---- 4. Anomaly + Confidence + trạng thái ----
   const flags = [];

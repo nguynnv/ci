@@ -1,12 +1,18 @@
 <!doctype html>
 <html lang="vi">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>unzi · Public Discord ranking</title><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/styles.css"></head>
-<body><main class="shell"><header class="topbar"><a class="brand" href="/"><i class="brand-mark"></i><span>unzi</span></a><div class="top-actions"><a class="btn ghost" id="login" href="/auth/login">Đăng nhập Discord</a><a class="btn primary" id="addBot" href="/auth/login">+ Thêm bot</a></div></header>
-<section class="hero"><span class="eyebrow">Public Discord intelligence</span><h1>Hiểu sức sống thật sự của một server.</h1><p>unzi là bảng xếp hạng công khai giúp cộng đồng nhìn thấy chất lượng tương tác, nhịp hoạt động và cách một server chào đón thành viên mới — minh bạch, có dữ liệu và không chạy theo những con số bề mặt.</p><div class="hero-actions"><a class="btn primary" id="heroBot" href="/auth/login">+ Thêm bot để tham gia</a><a class="btn ghost" href="#how">Tìm hiểu cách hoạt động ↓</a></div></section>
-<section id="how" class="grid three"><article class="card"><span class="eyebrow">01 · Observe</span><h2>Quan sát đúng điều quan trọng</h2><p class="muted">unzi dùng metadata đã ẩn danh để đo nhịp trò chuyện, tính đa dạng và mức độ tương tác thực tế.</p></article><article class="card"><span class="eyebrow">02 · Compare</span><h2>So sánh công bằng</h2><p class="muted">Mọi server được đánh giá trên cùng một hệ thống chỉ số, không dựa vào tổng member, boost hay quảng cáo.</p></article><article class="card"><span class="eyebrow">03 · Discover</span><h2>Khám phá cộng đồng tốt</h2><p class="muted">Profile, xu hướng và biểu đồ giúp người dùng chọn server phù hợp bằng thông tin rõ ràng hơn.</p></article></section>
-<section id="ranking" class="section-head"><div><span class="eyebrow">The public ranking</span><h2>Bảng xếp hạng cộng đồng</h2><p class="muted">Khu vực này có thể được admin mở hoặc ẩn hoàn toàn trong giai đoạn hệ thống đang tích lũy dữ liệu.</p></div></section><div id="ranking-view" class="grid"></div>
-<footer class="section-head"><span class="muted">unzi · privacy-first community intelligence</span><a class="muted" href="/methodology.html">Cách tính điểm</a></footer></main>
-<script>
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const api=(p,o)=>fetch('/api'+p,{headers:{'Content-Type':'application/json'},...o}).then(async r=>{if(!r.ok)throw Object.assign(new Error(r.status),{status:r.status});return r.json()});const icon=g=>g?.icon?`<img class="avatar" alt="" src="https://cdn.discordapp.com/icons/${esc(g.id)}/${esc(g.icon)}.png?size=128">`:`<span class="avatar"></span>`;const status=(t,ok)=>`<span class="status ${ok?'ok':''}">${t}</span>`;const num=(v,d=0)=>v==null?'—':Number(v).toFixed(d);
-async function session(){const d=await api('/session');const login=document.getElementById('login'),add=document.getElementById('addBot'),hero=document.getElementById('heroBot');if(d.authenticated){login.href='/auth/logout';login.textContent=`${esc(d.user.name)} · Đăng xuất`;add.href='/dashboard.html';add.textContent='+ Quản lý server';hero.href='/dashboard.html';hero.textContent='+ Quản lý server'}}async function ranking(){const box=document.getElementById('ranking-view');try{const rows=await api('/leaderboard');box.innerHTML=rows.length?rows.slice(0,8).map(r=>`<a class="server fade" href="/server.html?id=${esc(r.id)}">${icon(r)}<div class="server-main"><b>${esc(r.name)}</b><span class="server-meta">${r.status||'Đang tích lũy'} · confidence ${num(r.confidence)}%</span></div>${status(r.confidence>=60?'Dữ liệu tốt':'Đang tích lũy',r.confidence>=60)}<strong>${num(r.overall??r.activity)}</strong></a>`).join(''):'<div class="card muted">Chưa có server đủ dữ liệu để hiển thị.</div>'}catch(e){box.innerHTML=e.status===404?'<div class="card"><span class="eyebrow">Temporarily private</span><h2>Bảng xếp hạng đang được ẩn</h2><p class="muted">Tính năng sẽ xuất hiện khi admin mở công khai.</p></div>':'<div class="card notice">Không thể tải bảng xếp hạng lúc này.</div>'}}Promise.all([session(),ranking()]);
-</script></body></html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>unzi — Bảng xếp hạng server Discord</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bar"><nav id="nav"></nav></div>
+<main id="v"></main>
+<script src="/components/brand.js"></script>
+<script src="/components/dashboard.js"></script>
+<script src="/admin.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
