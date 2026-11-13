@@ -113,7 +113,7 @@ app.get('/api/guilds/:id', A(async (req, res) => {
   const snap = await latest(id), b = snap?.breakdown, ok = priv || b?.raw?.mam >= 10; // mẫu nhỏ: ẩn biểu đồ chi tiết với người ngoài
   const history = (await q('SELECT snap_date d, activity, welcoming, overall, confidence FROM score_snapshots WHERE guild_id=? AND scoring_version=? ORDER BY snap_date DESC LIMIT 90', [id, VERSION])).reverse();
   const r = b?.raw, names = new Map((g.channels || []).map((c) => [c.id, c.name]));
-  const out = { role: priv ? 'manager' : 'viewer', isAdmin: !!s?.isAdmin, history, avg: await radarAvg(),
+  const out = { role: priv ? 'manager' : 'viewer', bot_present: true, isAdmin: !!s?.isAdmin, history, avg: await radarAvg(),
     guild: { id: g.id, name: g.name, icon: g.icon, description: g.description, invite_url: g.invite_url },
     score: snap && { activity: snap.activity, welcoming: snap.welcoming, overall: snap.overall, confidence: snap.confidence, status: snap.ranking_status, computed_at: snap.computed_at,
       percentile: st.show_percentile === 'on' || priv ? snap.percentile : null, weights: b.weights, components: { activity: b.activity, welcoming: b.welcoming },
