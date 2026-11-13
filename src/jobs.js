@@ -6,7 +6,7 @@ const dayStr = (d) => d.toISOString().slice(0, 10);
 
 async function processGuild(g, now) {
   const r = await computeGuild(g, now), from = dayStr(new Date(g.consented_at));
-  const [[adjustment]] = await q('SELECT COALESCE(SUM(delta),0) total FROM score_adjustments WHERE guild_id=?', [g.id]);
+  const [adjustment] = await q('SELECT COALESCE(SUM(delta),0) total FROM score_adjustments WHERE guild_id=?', [g.id]);
   if (r.overall != null) r.overall = Math.max(0, Math.min(100, Math.round((r.overall + Number(adjustment.total)) * 10) / 10));
   const d = r.daily.slice(-3).filter((x) => x.day >= from).map((x) => [g.id, x.day, x.unique_active, x.messages, x.sessions, x.replies, x.joins, x.leaves]);
   if (d.length) await q('INSERT INTO daily_metrics (guild_id,day,unique_active,messages,sessions,replies,joins,leaves) VALUES ? ON DUPLICATE KEY UPDATE unique_active=VALUES(unique_active), messages=VALUES(messages), sessions=VALUES(sessions), replies=VALUES(replies), joins=VALUES(joins), leaves=VALUES(leaves)', [d]);
