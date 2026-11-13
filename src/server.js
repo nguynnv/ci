@@ -110,7 +110,7 @@ app.get('/api/guilds/:id', A(async (req, res) => {
     return res.json({ role: 'manager', bot_present: false, invite: `${INVITE}&guild_id=${id}&disable_guild_select=true`, guild: own });
   }
   if (!priv && !(g.enabled && !g.deleted_at && g.is_public && !g.hidden && !g.blocked && can(st.public_profiles, s))) return res.status(404).json({ error: 'not_found' });
-  const snap = await latest(id), b = snap?.breakdown, ok = priv || b?.raw?.mam >= 10; // mẫu nhỏ: ẩn biểu đồ chi tiết với người ngoài
+  const snap = await latest(id), b = snap?.breakdown, ok = !!b && (priv || b.raw?.mam >= 10); // mẫu nhỏ: ẩn biểu đồ chi tiết với người ngoài
   const history = (await q('SELECT snap_date d, activity, welcoming, overall, confidence FROM score_snapshots WHERE guild_id=? AND scoring_version=? ORDER BY snap_date DESC LIMIT 90', [id, VERSION])).reverse();
   const r = b?.raw, names = new Map((g.channels || []).map((c) => [c.id, c.name]));
   const out = { role: priv ? 'manager' : 'viewer', bot_present: true, isAdmin: !!s?.isAdmin, history, avg: await radarAvg(),
