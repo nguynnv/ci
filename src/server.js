@@ -95,8 +95,8 @@ app.get('/api/leaderboard', A(async (req, res) => {
 app.get('/api/me/guilds', need, A(async (req, res) => {
   const ids = req.s.guilds.map((g) => g.id);
   const have = ids.length ? await q(`SELECT g.id,g.enabled,g.paused,g.blocked,g.bot_present,s.activity,s.welcoming,s.overall,s.ranking_status status FROM guilds g ${LATEST} WHERE g.id IN (?)`, [VERSION, VERSION, ids]) : [];
-  const m = new Map(have.map((r) => [r.id, r]));
-  res.json({ invite: INVITE, guilds: req.s.guilds.map((g) => ({ ...g, ...(m.get(g.id) || { bot_present: 0 }), invite: `${INVITE}&guild_id=${g.id}&disable_guild_select=true` })) });
+  const m = new Map(have.map((r) => [String(r.id), r]));
+  res.json({ invite: INVITE, guilds: req.s.guilds.map((g) => ({ ...g, ...(m.get(String(g.id)) || { bot_present: 0 }), invite: `${INVITE}&guild_id=${g.id}&disable_guild_select=true` })) });
 }));
 
 // ---- Hồ sơ server: chủ server/admin xem đầy đủ; người khác chỉ xem nếu công tắc cho phép ----
