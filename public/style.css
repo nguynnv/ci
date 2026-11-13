@@ -86,5 +86,26 @@ dialog{background:var(--bg);color:var(--tx);border:1px solid var(--gb);border-ra
 .acl{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
 .rec{padding:10px 14px;border-left:3px solid var(--act);background:var(--gl);border-radius:0 10px 10px 0;margin:8px 0;font-size:14px}.rec.bad{border-color:var(--bad)}
 .warn{padding:12px 16px;border:1px solid var(--bad);border-radius:12px;color:var(--bad);margin:16px 0}
-@media(max-width:760px){.hero,.two,.tops,.intro-grid{grid-template-columns:1fr}.hero{padding-top:20px}}
+@media(max-width:760px){
+  html,body{overflow-x:hidden}
+  main,.bar{padding-left:16px;padding-right:16px}
+  .bar{height:auto;padding-top:12px;padding-bottom:10px}
+  #nav{align-items:center}
+  #nav .brand{width:100%;margin:0 0 4px}
+  #nav .sp{display:none}
+  #nav a{padding:6px 9px;font-size:13px}
+  #nav a.btn{margin-left:auto}
+  .hero,.two,.tops,.intro-grid{grid-template-columns:1fr}
+  .hero{padding-top:20px}
+  .hero p{font-size:15px}
+  .acts .btn{flex:1 1 100%;text-align:center}
+  .gr{grid-template-columns:minmax(0,1fr)}
+  .g{padding:16px}
+  .ph{align-items:stretch}
+  .ph>.btn{width:100%;text-align:center}
+  .lgd{flex-wrap:wrap;gap:8px 14px}
+  .ch-h{align-items:flex-start}
+  .seg button{padding-left:8px;padding-right:8px}
+  .tp{max-width:calc(100vw - 48px)}
+}
 @media(prefers-reduced-motion:reduce){*,*::before{animation-duration:.01ms!important;animation-delay:0s!important;transition:none!important}}

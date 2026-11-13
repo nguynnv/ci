@@ -121,7 +121,7 @@ function recs(d) {
 function nav() {
   const u = FT.user, h = location.hash || '#/', on = (p) => (h === p || h.startsWith(p + '/') ? 'on' : '');
   $('#nav').innerHTML = `<b class="brand">unzi <small>server intelligence</small></b><a href="#/" class="${h === '#/' ? 'on' : ''}">Trang chủ</a>${FT.leaderboard ? `<a href="#/leaderboard" class="${on('#/leaderboard')}">Xếp hạng công khai</a>` : ''}
-    ${u ? `<a href="#/dashboard" class="${on('#/dashboard')}">Dashboard</a>` : ''}${u?.isAdmin ? `<a href="#/admin" class="${on('#/admin')}">Admin</a>` : ''}<a href="#/methodology" class="${on('#/methodology')}">Cách tính</a><span class="sp"></span>
+    ${u ? `<a href="#/dashboard" class="${on('#/dashboard')}">Dashboard</a>` : ''}${u?.isAdmin ? `<a href="#/admin" class="${on('#/admin')}">Admin</a>` : ''}<a href="#/methodology" class="${on('#/methodology')}">Cách tính</a><a href="/terms.html">Điều khoản</a><a href="/privacy.html">Quyền riêng tư</a><span class="sp"></span>
     ${u ? `<span class="usr">${u.avatar ? `<img alt="" src="https://cdn.discordapp.com/avatars/${esc(u.id)}/${esc(u.avatar)}.png?size=64">` : ''}${esc(u.name)}</span><a href="/auth/logout">Đăng xuất</a>` : '<a class="btn p" href="/auth/login">Đăng nhập với Discord</a>'}`;
 }
 
